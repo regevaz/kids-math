@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>נינג'ה הכפל</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="hud" aria-label="לוח משחק">
+        <div class="brand">
+          <div class="logo" aria-hidden="true">×</div>
+          <div>
+            <h1>נינג'ה הכפל</h1>
+            <p>חותכים את התשובה הנכונה לפני שהיא נעלמת</p>
+          </div>
+        </div>
+
+        <div class="stats" aria-live="polite">
+          <div>
+            <span>נקודות</span>
+            <strong id="score">0</strong>
+          </div>
+          <div>
+            <span>רצף</span>
+            <strong id="streak">0</strong>
+          </div>
+          <div>
+            <span>חיים</span>
+            <strong id="lives">3</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="play-area" aria-label="אזור משחק">
+        <div class="challenge">
+          <span id="roundLabel">שלב 1</span>
+          <strong id="question">7 × 8</strong>
+        </div>
+
+        <canvas id="gameCanvas" width="960" height="560" aria-label="תשובות נופלות"></canvas>
+
+        <div class="overlay is-visible" id="startOverlay">
+          <div class="modal">
+            <h2>מוכנים?</h2>
+            <p>חתכו את הפרי עם התשובה הנכונה. חיתוך לא נכון מוריד חיים.</p>
+            <div class="controls">
+              <label for="tableSelect">תרגול</label>
+              <select id="tableSelect">
+                <option value="mixed">מעורב 2-12</option>
+                <option value="6">כפולות 6</option>
+                <option value="7">כפולות 7</option>
+                <option value="8">כפולות 8</option>
+                <option value="9">כפולות 9</option>
+                <option value="12">כפולות 12</option>
+              </select>
+            </div>
+            <button id="startGame" type="button">התחלה</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tools" aria-label="כלים">
+        <button id="pauseGame" type="button">השהיה</button>
+        <button id="newGame" type="button">משחק חדש</button>
+        <p id="feedback" role="status">בחרו מצב ולחצו התחלה.</p>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
