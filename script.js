@@ -7,6 +7,7 @@ const livesEl = document.querySelector("#lives");
 const questionEl = document.querySelector("#question");
 const roundLabelEl = document.querySelector("#roundLabel");
 const feedbackEl = document.querySelector("#feedback");
+const playArea = document.querySelector(".play-area");
 const startOverlay = document.querySelector("#startOverlay");
 const startGame = document.querySelector("#startGame");
 const tableSelect = document.querySelector("#tableSelect");
@@ -25,6 +26,7 @@ const fruits = [
 ];
 const slashMarks = [];
 const particles = [];
+const scoreBursts = [];
 
 let answers = [];
 let running = false;
@@ -88,19 +90,38 @@ function createAnswerSet() {
     speed: speed + rand(-8, 20),
     fruit: fruits[rand(0, fruits.length - 1)],
     wobble: Math.random() * Math.PI * 2,
+    spin: (Math.random() - 0.5) * 0.5,
+    scale: 0.94 + Math.random() * 0.16,
+    trail: [],
     cut: false,
   }));
 }
 
-function updateHud() {
+function bumpElement(element) {
+  element.classList.remove("is-bumping");
+  void element.offsetWidth;
+  element.classList.add("is-bumping");
+}
+
+function pulseFeedback() {
+  feedbackEl.classList.remove("is-pulsing");
+  void feedbackEl.offsetWidth;
+  feedbackEl.classList.add("is-pulsing");
+}
+
+function updateHud(bump = null) {
   scoreEl.textContent = score;
   streakEl.textContent = streak;
   livesEl.textContent = "♥".repeat(Math.max(lives, 0));
+  if (bump === "score") bumpElement(scoreEl.parentElement);
+  if (bump === "streak") bumpElement(streakEl.parentElement);
+  if (bump === "lives") bumpElement(livesEl.parentElement);
 }
 
 function setFeedback(text, tone = "normal") {
   feedbackEl.textContent = text;
   feedbackEl.style.borderColor = tone === "good" ? "#1f8a70" : tone === "bad" ? "#c84b31" : "#d9ded8";
+  pulseFeedback();
 }
 
 function start() {
@@ -118,7 +139,8 @@ function start() {
   centerCue = null;
   slashMarks.length = 0;
   particles.length = 0;
-  updateHud();
+  scoreBursts.length = 0;
+  updateHud("score");
   resizeCanvas();
   newQuestion();
   lastTime = performance.now();
@@ -146,8 +168,10 @@ function correct(x, y) {
   speed = Math.min(105, speed + 2);
   slashMarks.push({ x, y, age: 0, type: "good" });
   burst(x, y, "good");
+  scoreBursts.push({ x, y, text: `+${10 + Math.min(streak - 1, 10) * 2}`, age: 0, type: "good" });
   showCenterCue("בול!", "+10", "good");
-  updateHud();
+  updateHud("score");
+  bumpElement(streakEl.parentElement);
   newQuestion();
 }
 
@@ -158,7 +182,10 @@ function wrong(x = canvas.clientWidth / 2, y = canvas.clientHeight / 2) {
   slashMarks.push({ x, y, age: 0, type: "bad" });
   burst(x, y, "bad");
   showCenterCue("אופס!", `התשובה: ${current.answer}`, "bad");
-  updateHud();
+  playArea.classList.remove("is-shaking");
+  void playArea.offsetWidth;
+  playArea.classList.add("is-shaking");
+  updateHud("lives");
   if (lives <= 0) {
     stopWithMessage("נגמרו החיים", `צברתם ${score} נקודות. נסו שוב ותראו איך הרצף עולה.`);
   } else {
@@ -177,16 +204,33 @@ function checkAnswer(value, x = canvas.clientWidth / 2, y = canvas.clientHeight 
 
 function drawBackground(width, height) {
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
+
+  const sky = ctx.createLinearGradient(0, 0, 0, height);
+  sky.addColorStop(0, "rgba(255,255,255,0.16)");
+  sky.addColorStop(0.55, "rgba(22,131,109,0.045)");
+  sky.addColorStop(1, "rgba(229,169,63,0.08)");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.38)";
   for (let i = 0; i < 7; i += 1) {
-    const y = 115 + i * 62;
+    const y = 118 + i * 62;
     ctx.fillRect(0, y, width, 1);
   }
 
-  ctx.fillStyle = "#17212b";
-  ctx.globalAlpha = 0.08;
+  const focus = ctx.createRadialGradient(width * 0.5, height * 0.48, 60, width * 0.5, height * 0.48, Math.max(width, height) * 0.58);
+  focus.addColorStop(0, "rgba(255,255,255,0.0)");
+  focus.addColorStop(1, "rgba(24,32,42,0.08)");
+  ctx.fillStyle = focus;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "rgba(24,32,42,0.055)";
   ctx.beginPath();
   ctx.arc(width - 96, height - 86, 60, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "rgba(229,169,63,0.75)";
+  ctx.beginPath();
+  ctx.roundRect(width - 150, height - 35, 86, 6, 4);
   ctx.fill();
   ctx.globalAlpha = 1;
 }
@@ -197,12 +241,12 @@ function showCenterCue(title, subtitle, type) {
 
 function burst(x, y, type) {
   const palette = type === "good"
-    ? ["#f2b84b", "#1f8a70", "#ffffff", "#75a843"]
-    : ["#c84b31", "#17212b", "#ffffff", "#e98626"];
+    ? ["#e5a93f", "#16836d", "#ffffff", "#75a843", "#2669b5"]
+    : ["#ca4a34", "#18202a", "#ffffff", "#e98626"];
 
-  for (let i = 0; i < 18; i += 1) {
-    const angle = (Math.PI * 2 * i) / 18 + Math.random() * 0.3;
-    const force = rand(type === "good" ? 90 : 55, type === "good" ? 180 : 125);
+  for (let i = 0; i < 26; i += 1) {
+    const angle = (Math.PI * 2 * i) / 26 + Math.random() * 0.32;
+    const force = rand(type === "good" ? 120 : 70, type === "good" ? 260 : 150);
     particles.push({
       x,
       y,
@@ -212,34 +256,59 @@ function burst(x, y, type) {
       color: palette[i % palette.length],
       type,
       age: 0,
-      life: rand(420, 720),
+      life: rand(520, 920),
     });
+  }
+}
+
+function drawFruitTrail(answer) {
+  for (let i = 0; i < answer.trail.length; i += 1) {
+    const point = answer.trail[i];
+    const alpha = (i + 1) / answer.trail.length;
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.13;
+    ctx.fillStyle = answer.fruit.color;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 22 * alpha, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 }
 
 function drawAnswer(answer) {
   const wobbleX = Math.sin(answer.wobble) * 5;
+  drawFruitTrail(answer);
+
   ctx.save();
   ctx.translate(answer.x + wobbleX, answer.y);
-  ctx.rotate(Math.sin(answer.wobble * 0.7) * 0.08);
+  ctx.rotate(Math.sin(answer.wobble * 0.7) * 0.08 + answer.spin);
+  ctx.scale(answer.scale, answer.scale);
 
-  ctx.font = "72px Arial";
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "#18202a";
+  ctx.beginPath();
+  ctx.ellipse(0, 42, 42, 11, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.font = "84px Arial";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(answer.fruit.icon, 0, 0);
+  ctx.fillText(answer.fruit.icon, 0, -7);
 
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
   ctx.beginPath();
-  ctx.roundRect(-31, -20, 62, 40, 8);
+  ctx.roundRect(-31, 12, 62, 38, 8);
   ctx.fill();
 
   ctx.strokeStyle = answer.fruit.color;
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3.5;
   ctx.stroke();
 
   ctx.fillStyle = "#17212b";
-  ctx.font = "900 25px Arial";
-  ctx.fillText(answer.value, 0, 2);
+  ctx.font = "900 24px Arial";
+  ctx.fillText(answer.value, 0, 32);
   ctx.restore();
 }
 
@@ -250,8 +319,10 @@ function drawSlashes(delta) {
     const alpha = Math.max(0, 1 - mark.age / 820);
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = mark.type === "good" ? "#f2b84b" : "#c84b31";
-    ctx.lineWidth = mark.type === "good" ? 9 : 7;
+    ctx.shadowColor = mark.type === "good" ? "rgba(229,169,63,0.55)" : "rgba(202,74,52,0.42)";
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = mark.type === "good" ? "#e5a93f" : "#ca4a34";
+    ctx.lineWidth = mark.type === "good" ? 11 : 8;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(mark.x - 48, mark.y + 38);
@@ -265,6 +336,7 @@ function drawSlashes(delta) {
       ctx.stroke();
     } else {
       ctx.strokeStyle = "#ffffff";
+      ctx.shadowBlur = 0;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(mark.x - 40, mark.y + 30);
@@ -291,6 +363,8 @@ function drawParticles(delta) {
     ctx.fillStyle = particle.color;
     ctx.translate(particle.x, particle.y);
     ctx.rotate(particle.age / 90);
+    ctx.shadowColor = particle.color;
+    ctx.shadowBlur = particle.type === "good" ? 10 : 5;
     if (particle.type === "good") {
       ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
     } else {
@@ -304,36 +378,64 @@ function drawParticles(delta) {
   }
 }
 
+function drawScoreBursts(delta) {
+  for (let i = scoreBursts.length - 1; i >= 0; i -= 1) {
+    const burstText = scoreBursts[i];
+    burstText.age += delta;
+    const progress = Math.min(1, burstText.age / 900);
+    const alpha = 1 - progress;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(burstText.x, burstText.y - progress * 70);
+    ctx.scale(1 + Math.sin(progress * Math.PI) * 0.12, 1 + Math.sin(progress * Math.PI) * 0.12);
+    ctx.fillStyle = "#16836d";
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 5;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "900 28px Arial";
+    ctx.strokeText(burstText.text, 0, 0);
+    ctx.fillText(burstText.text, 0, 0);
+    ctx.restore();
+
+    if (burstText.age > 900) scoreBursts.splice(i, 1);
+  }
+}
+
 function drawCenterCue(delta, width, height) {
   if (!centerCue) return;
 
   centerCue.age += delta;
   const life = 2200;
   const progress = Math.min(1, centerCue.age / life);
-  const alpha = progress < 0.72 ? 1 : 1 - (progress - 0.72) / 0.28;
+  const alpha = progress < 0.68 ? 1 : 1 - (progress - 0.68) / 0.32;
   const scale = centerCue.type === "good"
-    ? 0.8 + Math.sin(progress * Math.PI) * 0.24
+    ? 0.78 + Math.sin(progress * Math.PI) * 0.26
     : 1 + Math.sin(progress * Math.PI * 5) * 0.06;
 
   ctx.save();
   ctx.globalAlpha = Math.max(0, alpha);
   ctx.translate(width / 2, height / 2);
   ctx.scale(scale, scale);
-  ctx.fillStyle = centerCue.type === "good" ? "rgba(31, 138, 112, 0.92)" : "rgba(200, 75, 49, 0.94)";
+  ctx.shadowColor = centerCue.type === "good" ? "rgba(22,131,109,0.4)" : "rgba(202,74,52,0.36)";
+  ctx.shadowBlur = 28;
+  ctx.fillStyle = centerCue.type === "good" ? "rgba(22, 131, 109, 0.94)" : "rgba(202, 74, 52, 0.95)";
   ctx.beginPath();
-  ctx.roundRect(-132, -68, 264, 136, 8);
+  ctx.roundRect(-142, -72, 284, 144, 8);
   ctx.fill();
 
-  ctx.strokeStyle = "#ffffff";
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(255,255,255,0.94)";
   ctx.lineWidth = 4;
   ctx.stroke();
 
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "900 46px Arial";
+  ctx.font = "900 50px Arial";
   ctx.fillText(centerCue.title, 0, -16);
-  ctx.font = "800 22px Arial";
+  ctx.font = "900 23px Arial";
   ctx.fillText(centerCue.subtitle, 0, 32);
   ctx.restore();
 
@@ -354,11 +456,15 @@ function loop(now) {
     answers.forEach((answer) => {
       answer.y += (answer.speed * delta) / 1000;
       answer.wobble += delta / 350;
+      answer.spin += Math.sin(answer.wobble) * 0.0007 * delta;
+      answer.trail.push({ x: answer.x + Math.sin(answer.wobble) * 5, y: answer.y });
+      if (answer.trail.length > 7) answer.trail.shift();
       drawAnswer(answer);
     });
 
     drawSlashes(delta);
     drawParticles(delta);
+    drawScoreBursts(delta);
     drawCenterCue(delta, width, height);
 
     if (answers.some((answer) => answer.value === current.answer && answer.y > height + 92)) {
