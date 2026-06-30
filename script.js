@@ -175,13 +175,19 @@ function correct(x, y) {
   newQuestion();
 }
 
-function wrong(x = canvas.clientWidth / 2, y = canvas.clientHeight / 2) {
+function wrong(x = canvas.clientWidth / 2, y = canvas.clientHeight / 2, reason = "slice") {
   lives -= 1;
   streak = 0;
-  setFeedback(`לא הפעם. התשובה הייתה ${current.answer}.`, "bad");
-  slashMarks.push({ x, y, age: 0, type: "bad" });
-  burst(x, y, "bad");
-  showCenterCue("אופס!", `התשובה: ${current.answer}`, "bad");
+  if (reason === "miss") {
+    setFeedback(`הפרי נפל. התשובה הייתה ${current.answer}.`, "bad");
+    splash(x, y);
+    showCenterCue("נפל!", `התשובה: ${current.answer}`, "bad");
+  } else {
+    setFeedback(`לא הפעם. התשובה הייתה ${current.answer}.`, "bad");
+    slashMarks.push({ x, y, age: 0, type: "bad" });
+    burst(x, y, "bad");
+    showCenterCue("אופס!", `התשובה: ${current.answer}`, "bad");
+  }
   playArea.classList.remove("is-shaking");
   void playArea.offsetWidth;
   playArea.classList.add("is-shaking");
@@ -257,6 +263,37 @@ function burst(x, y, type) {
       type,
       age: 0,
       life: rand(520, 920),
+    });
+  }
+}
+
+function splash(x, y) {
+  const palette = ["#e98626", "#ca4a34", "#e5a93f", "#75a843", "#ffffff"];
+  particles.push({
+    x,
+    y: y + 4,
+    vx: 0,
+    vy: 0,
+    size: 14,
+    color: "rgba(202,74,52,0.72)",
+    type: "splash-ring",
+    age: 0,
+    life: 1500,
+  });
+
+  for (let i = 0; i < 30; i += 1) {
+    const side = i % 2 === 0 ? -1 : 1;
+    const spread = rand(80, 250) * side * (0.45 + Math.random() * 0.55);
+    particles.push({
+      x,
+      y,
+      vx: spread,
+      vy: -rand(90, 270),
+      size: rand(4, 11),
+      color: palette[i % palette.length],
+      type: "splash",
+      age: 0,
+      life: rand(1100, 1800),
     });
   }
 }
@@ -355,7 +392,7 @@ function drawParticles(delta) {
     particle.age += delta;
     particle.x += (particle.vx * delta) / 1000;
     particle.y += (particle.vy * delta) / 1000;
-    particle.vy += (particle.type === "good" ? 240 : 330) * delta / 1000;
+    particle.vy += (particle.type === "good" ? 240 : particle.type === "splash" ? 420 : 330) * delta / 1000;
 
     const alpha = Math.max(0, 1 - particle.age / particle.life);
     ctx.save();
@@ -364,9 +401,27 @@ function drawParticles(delta) {
     ctx.translate(particle.x, particle.y);
     ctx.rotate(particle.age / 90);
     ctx.shadowColor = particle.color;
-    ctx.shadowBlur = particle.type === "good" ? 10 : 5;
-    if (particle.type === "good") {
+    ctx.shadowBlur = particle.type === "good" ? 10 : particle.type === "splash-ring" ? 14 : 5;
+
+    if (particle.type === "splash-ring") {
+      const progress = Math.min(1, particle.age / particle.life);
+      ctx.rotate(-particle.age / 90);
+      ctx.strokeStyle = particle.color;
+      ctx.lineWidth = 5 * (1 - progress);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 28 + progress * 74, 8 + progress * 18, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(202,74,52,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(0, 5, 38 + progress * 44, 7 + progress * 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (particle.type === "good") {
       ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+    } else if (particle.type === "splash") {
+      ctx.scale(1.45, 0.72);
+      ctx.beginPath();
+      ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       ctx.beginPath();
       ctx.arc(0, 0, particle.size, 0, Math.PI * 2);
@@ -467,8 +522,9 @@ function loop(now) {
     drawScoreBursts(delta);
     drawCenterCue(delta, width, height);
 
-    if (answers.some((answer) => answer.value === current.answer && answer.y > height + 92)) {
-      wrong();
+    const missed = answers.find((answer) => answer.value === current.answer && answer.y > height + 92);
+    if (missed) {
+      wrong(missed.x, height - 22, "miss");
     }
   }
 
